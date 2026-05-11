@@ -25,13 +25,8 @@ public sealed class QualificationResultsAdapter : IDisposable
                 ?.FirstOrDefault(s => s.Id == stageId
                     || s.Label?.Equals($"Qualy {stageId}", StringComparison.OrdinalIgnoreCase) is true)
             ?? throw new InvalidOperationException($"Qualification stage {stageId} not found in race {raceId}.");
-        if (stage.Heats is null || stage.Heats.All(h => h.Status != Status.Finished))
-        {
-            throw new InvalidOperationException($"Stage {stageId} has no finished heats.");
-        }
 
-        var completedHeats = stage.Heats.Where(h => h.Status == Status.Finished).ToArray();
-        return await GetAndTransformQualificationStageResults(raceId, completedHeats, cancellationToken);
+        return await GetAndTransformQualificationStageResults(raceId, stage, cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<MultiStageQualificationResult>> GetMultiStageQualificationResults(
@@ -44,29 +39,14 @@ public sealed class QualificationResultsAdapter : IDisposable
             throw new InvalidOperationException($"Race {raceId} does not contain any qualification stages.");
         }
 
-        var stageResults = new List<IReadOnlyCollection<QualificationResult>>();
-        foreach (var stage in qualificationStages)
-        {
-            if (stage.Heats is null)
-            {
-                continue;
-            }
-
-            if (stage.Heats.Any(h => h.Status != Status.Finished))
-            {
-                throw new InvalidOperationException(
-                    $"Some of heats in stage {stage.Label ?? stage.Index.ToString()} are not finished yet.");
-            }
-
-            stageResults.Add(await GetAndTransformQualificationStageResults(raceId, stage.Heats, cancellationToken));
-        }
-
-        var participants = stageResults
-            .SelectMany(stage => stage.Select(r => r.Participant))
-            .Distinct()
+        var stageResults = (await Task.WhenAll(
+                qualificationStages.Select(stage =>
+                    GetAndTransformQualificationStageResults(raceId, stage, cancellationToken))))
             .ToArray();
 
-        return participants
+        return stageResults
+            .SelectMany(stage => stage.Select(r => r.Participant))
+            .Distinct()
             .Select(participant =>
             {
                 var resultsPerStage = stageResults
@@ -92,10 +72,16 @@ public sealed class QualificationResultsAdapter : IDisposable
 
     private async Task<IReadOnlyCollection<QualificationResult>> GetAndTransformQualificationStageResults(
         Guid raceId,
-        IReadOnlyCollection<StageHeatDto> stageHeats,
+        RaceStageDto stage,
         CancellationToken cancellationToken)
     {
-        var heatResultResponses = await Task.WhenAll(stageHeats.Where(h => h.Id.HasValue)
+        if (stage.Heats is null || stage.Heats.All(h => h.Status != Status.Finished))
+        {
+            throw new InvalidOperationException($"Stage {stage.Id} has not finished heats.");
+        }
+
+        var finishedHeats = stage.Heats.Where(h => h.Status == Status.Finished).ToArray();
+        var heatResultResponses = await Task.WhenAll(finishedHeats.Where(h => h.Id.HasValue)
             .Select(heat => _agent.GetHeatResults(raceId, heat.Id!.Value, cancellationToken)));
         var heatResults = heatResultResponses.SelectMany(results => results).ToArray();
 
@@ -109,7 +95,7 @@ public sealed class QualificationResultsAdapter : IDisposable
                 Position: i + 1,
                 result.Participant ?? $"Participant {result.ParticipantId}",
                 result.Kart,
-                stageHeats.First(h => h.Id == result.HeatId).Label,
+                finishedHeats.First(h => h.Id == result.HeatId).Label,
                 new LapTime(result.BestLapTimeRaw),
                 Gap: i == 0 || result.BestLapTimeRaw == int.MaxValue
                     ? Gap.FromMs(0)

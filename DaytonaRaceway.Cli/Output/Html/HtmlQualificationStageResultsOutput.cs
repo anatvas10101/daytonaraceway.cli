@@ -14,41 +14,40 @@ public static partial class HtmlOutput
     {
         var filename = $"{raceId}_qualification_stage_{stageId}_results_{TimeProvider.System.GetLocalNow():HHmmss}.html";
         var filePath = Path.Combine(AppContext.BaseDirectory, filename);
-        
-        var html = new StringBuilder();
-        html.AppendLine("<!DOCTYPE html>");
-        html.AppendLine("<html><head><meta charset=\"utf-8\"><title>Qualification Results</title></head><body>");
-        html.AppendLine("<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\">");
-        html.AppendLine("<thead><tr>");
-        html.Append("<th>Position</th>");
-        html.Append("<th>Participant</th>");
-        html.Append("<th>Kart</th>");
-        html.Append("<th>Heat</th>");
-        html.Append("<th>Best lap</th>");
-        html.Append("<th>Gap</th>");
-        html.Append("<th>Interval</th>");
-        html.Append("<th>%</th>");
-        html.Append("<th>Laps</th>");
-        html.AppendLine("</tr></thead>");
 
-        html.AppendLine("<tbody>");
+        var html = BuildHtmlHead("Qualification Results")
+            .AppendLine("<body>")
+            .AppendLine("<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\">")
+            .AppendLine("<thead><tr>")
+            .Append("<th>Pos</th>")
+            .Append("<th>Participant</th>")
+            .Append("<th>Kart</th>")
+            .Append("<th>Heat</th>")
+            .Append("<th>Best lap</th>")
+            .Append("<th>Gap</th>")
+            .Append("<th>Interval</th>")
+            .Append("<th>%</th>")
+            .Append("<th>Laps</th>")
+            .AppendLine("</tr></thead>")
+            .AppendLine("<tbody>");
 
         foreach (var result in results)
         {
-            html.AppendLine("<tr>");
-            html.Append($"<td>{result.Position}</td>");
-            html.Append($"<td>{HttpUtility.HtmlEncode(result.Participant)}</td>");
-            html.Append($"<td>{HttpUtility.HtmlEncode(result.Kart)}</td>");
-            html.Append($"<td>{HttpUtility.HtmlEncode(result.Heat?.Replace("Heat", string.Empty).Trim())}</td>");
-            html.Append($"<td>{HttpUtility.HtmlEncode(result.BestLapTime.ToString())}</td>");
-            html.Append($"<td>{HttpUtility.HtmlEncode(result.Gap.ToString())}</td>");
-            html.Append($"<td>{HttpUtility.HtmlEncode(result.Interval.ToString())}</td>");
-            html.Append($"<td>{result.Percent:F3}</td>");
-            html.Append($"<td>{result.CompletedLaps}</td>");
-            html.AppendLine("</tr>");
+            html.AppendLine("<tr>")
+                .Append($"<td>{result.Position}</td>")
+                .Append($"<td>{HttpUtility.HtmlEncode(result.Participant)}</td>")
+                .Append($"<td>{HttpUtility.HtmlEncode(result.Kart)}</td>")
+                .Append($"<td>{HttpUtility.HtmlEncode(result.Heat?.Replace("Heat", string.Empty).Trim())}</td>")
+                .Append($"<td>{HttpUtility.HtmlEncode(result.BestLapTime.ToString())}</td>")
+                .Append($"<td>{HttpUtility.HtmlEncode(result.Gap.ToString())}</td>")
+                .Append($"<td>{HttpUtility.HtmlEncode(result.Interval.ToString())}</td>")
+                .Append($"<td>{result.Percent:F3}</td>")
+                .Append($"<td>{result.CompletedLaps}</td>")
+                .AppendLine("</tr>");
         }
-        html.AppendLine("</tbody></table>");
-        html.AppendLine("</body></html>");
+
+        html.AppendLine("</tbody></table>")
+            .AppendLine("</body></html>");
 
         await File.WriteAllTextAsync(filePath, html.ToString(), Encoding.UTF8, cancellationToken);
         return new Uri(filePath);
