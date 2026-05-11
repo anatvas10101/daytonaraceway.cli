@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="DaytonaRaceway.Adapter/DaytonaRaceway.Adapter.csproj" />
+  <Project Path="DaytonaRaceway.Agent/DaytonaRaceway.Agent.csproj" />
+  <Project Path="DaytonaRaceway.Cli/DaytonaRaceway.Cli.csproj" />
+</Solution>
