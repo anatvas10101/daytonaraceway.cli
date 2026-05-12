@@ -23,6 +23,9 @@ app.Configure(config =>
 
     config.AddCommand<GroupsDistributionCommand>("groups")
         .WithDescription("Splits participants into <COUNT> groups based on qualification results.");
+
+    config.AddCommand<PointsScaleCommand>("points")
+        .WithDescription("Shows a points scale of a selected type for a given number of participants.");
 });
 
 return await app.RunAsync(args, cancellationTokenSource.Token);
