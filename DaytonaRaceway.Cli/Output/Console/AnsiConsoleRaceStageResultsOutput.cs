@@ -23,7 +23,7 @@ public static partial class AnsiConsoleOutput
         var gapPad = Math.Max(results.Max(x => x.Gap.ToString()?.Length) ?? -1, "Gap".Length) + 2;
         var intervalPad = Math.Max(results.Max(x => x.Interval.ToString()?.Length) ?? -1, "Interval".Length) + 2;
         var blPad = Math.Max(results.Max(x => x.BestLapTime.ToString()?.Length) ?? -1, "Best lap".Length) + 2;
-        var pointsPad = 4;
+        var pointsPad = 5;
 
         var headerString = new StringBuilder()
             .Append("Heat".PadRight(heatPad))
@@ -35,6 +35,7 @@ public static partial class AnsiConsoleOutput
             .Append("Interval".PadRight(intervalPad))
             .Append("Best lap".PadRight(blPad))
             .Append("Pts".PadRight(pointsPad))
+            .Append("Bonus".PadRight(pointsPad))
             .ToString();
 
         AnsiConsole.MarkupLine($"[bold]{headerString}[/]");
@@ -56,6 +57,7 @@ public static partial class AnsiConsoleOutput
                 .Append(result.Interval.ToString().PadRight(intervalPad))
                 .Append(result.BestLapTime.ToString().PadRight(blPad))
                 .Append(result.Points.ToString().PadRight(pointsPad))
+                .Append(result.ExtraPoints.ToString().PadRight(pointsPad))
                 .ToString();
 
             AnsiConsole.MarkupLine(rowString);

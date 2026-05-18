@@ -66,6 +66,11 @@ public sealed class RaceResultsAdapter : IDisposable
             ? PointsDistribution.CreateFinalScale(orderedResults.Length)
             : PointsDistribution.CreateStageScale(orderedResults.GroupBy(r => r.HeatId).Max(x => x.Count()));
 
+        var participantPerHeatWithBestLapExtraPoint = orderedResults
+            .Select(r => r.BestLapTimeRaw == 0 ? r with { BestLapTimeRaw = int.MaxValue } : r)
+            .GroupBy(r => r.HeatId)
+            .ToDictionary(h => h.Key, x => x.MinBy(r => r.BestLapTimeRaw)!.ParticipantId);
+
         return orderedResults
             .Select((result, endToEndPosition) => new RaceResult(
                 result.Position,
@@ -77,7 +82,8 @@ public sealed class RaceResultsAdapter : IDisposable
                 Gap: Gap.ParseGap(result.Gap),
                 Interval: Gap.ParseGap(result.Interval),
                 BestLapTime: new LapTime(result.BestLapTimeRaw),
-                Points: pointsScale[stage.IsFinalStage ? endToEndPosition + 1 : result.Position]))
+                Points: pointsScale[stage.IsFinalStage ? endToEndPosition + 1 : result.Position],
+                ExtraPoints: participantPerHeatWithBestLapExtraPoint[result.HeatId] == result.ParticipantId ? 1 : 0))
             .ToArray();
     }
 }

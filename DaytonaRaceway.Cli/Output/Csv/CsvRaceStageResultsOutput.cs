@@ -39,6 +39,7 @@ public static partial class CsvOutput
                 .Name("Best lap")
                 .Convert(args => args.Value.BestLapTime.ToString());
             Map(r => r.Points).Name("Points");
+            Map(r => r.ExtraPoints).Name("Bonus");
         }
     }
 }
