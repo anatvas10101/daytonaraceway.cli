@@ -22,7 +22,7 @@ public static partial class HtmlOutput
         foreach (var heatResults in resultsByHeat)
         {
             html.AppendLine("<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\">")
-                .AppendLine($"<thead><tr><th colspan=\"9\">{heatResults.Key}</th></tr></thead>")
+                .AppendLine($"<thead><tr><th colspan=\"10\">{heatResults.Key}</th></tr></thead>")
                 .AppendLine("<thead><tr>")
                 .Append("<th>Pos</th>")
                 .Append("<th>Participant</th>")
@@ -33,6 +33,7 @@ public static partial class HtmlOutput
                 .Append("<th>Best lap</th>")
                 .Append("<th>Pts</th>")
                 .Append("<th>Bonus</th>")
+                .Append("<th>Penalty</th>")
                 .AppendLine("</tr></thead>")
                 .AppendLine("<tbody>");
 
@@ -46,8 +47,9 @@ public static partial class HtmlOutput
                     .Append($"<td>{HttpUtility.HtmlEncode(result.Gap.ToString())}</td>")
                     .Append($"<td>{HttpUtility.HtmlEncode(result.Interval.ToString())}</td>")
                     .Append($"<td>{HttpUtility.HtmlEncode(result.BestLapTime.ToString())}</td>")
-                    .Append($"<td>{result.Points}</td>")
+                    .Append($"<td>{result.Points + result.ExtraPoints - result.Penalty}</td>")
                     .Append($"<td>{result.ExtraPoints}</td>")
+                    .Append($"<td>{result.Penalty}</td>")
                     .AppendLine("</tr>");
             }
 

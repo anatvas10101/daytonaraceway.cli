@@ -88,6 +88,20 @@ public sealed class ApiAgent : IDisposable
             .ToList();
     }
 
+    public async Task<HeatRunDetailsResponse> GetHeatRunDetails(int heatRunId, CancellationToken cancellationToken)
+    {
+        var url = $"/rest-api/races/race/session-management/race-heat-run-info?race_heat_run_id={heatRunId}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        using var response = await _client.SendAsync(request, cancellationToken);
+        var rawContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        
+        using var json = JsonDocument.Parse(rawContent);
+
+        return json.RootElement
+            .GetProperty("data")
+            .Deserialize<HeatRunDetailsResponse>()!;
+    }
+
     public async Task<EventParticipantsResponse> GetParticipants(Guid raceId, CancellationToken cancellationToken)
     {
         var url = $"/rest-api/races/race/{raceId}/participants";

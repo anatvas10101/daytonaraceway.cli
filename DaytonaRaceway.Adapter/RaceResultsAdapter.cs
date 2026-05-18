@@ -55,6 +55,10 @@ public sealed class RaceResultsAdapter : IDisposable
             .Select(heat => _agent.GetHeatResults(raceId, heat.Id!.Value, cancellationToken)));
         var heatResults = heatResultResponses.SelectMany(results => results).ToArray();
 
+        var penalties = (await Task.WhenAll(heatResults
+            .Select(x => _agent.GetHeatRunDetails(x.HeatRunId, cancellationToken))))
+            .ToDictionary(x => x.Id, x => x.Penalties.Sum(p => p.Penalty));
+
         var orderedResults =
             (stage.IsFinalStage && finalStageHeatsOrdering == FinalStageHeatsOrdering.Desc
                 ? heatResults.OrderByDescending(r => r.HeatId)
@@ -83,7 +87,8 @@ public sealed class RaceResultsAdapter : IDisposable
                 Interval: Gap.ParseGap(result.Interval),
                 BestLapTime: new LapTime(result.BestLapTimeRaw),
                 Points: pointsScale[stage.IsFinalStage ? endToEndPosition + 1 : result.Position],
-                ExtraPoints: participantPerHeatWithBestLapExtraPoint[result.HeatId] == result.ParticipantId ? 1 : 0))
+                ExtraPoints: participantPerHeatWithBestLapExtraPoint[result.HeatId] == result.ParticipantId ? 1 : 0,
+                Penalty: penalties.GetValueOrDefault(result.HeatRunId, 0)))
             .ToArray();
     }
 }

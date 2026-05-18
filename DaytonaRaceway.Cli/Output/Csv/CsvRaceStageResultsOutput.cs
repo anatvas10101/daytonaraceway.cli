@@ -38,8 +38,10 @@ public static partial class CsvOutput
             Map(r => r.BestLapTime)
                 .Name("Best lap")
                 .Convert(args => args.Value.BestLapTime.ToString());
-            Map(r => r.Points).Name("Points");
+            Map(r => r.Points).Name("Points")
+                .Convert(args => (args.Value.Points + args.Value.ExtraPoints - args.Value.Penalty).ToString());
             Map(r => r.ExtraPoints).Name("Bonus");
+            Map(r => r.Penalty).Name("Penalty");
         }
     }
 }

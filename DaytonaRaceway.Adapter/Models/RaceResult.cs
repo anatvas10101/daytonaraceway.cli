@@ -11,4 +11,5 @@ public record RaceResult(
     Gap Interval,
     LapTime BestLapTime,
     int Points,
-    int ExtraPoints);
+    int ExtraPoints,
+    int Penalty);

@@ -35,7 +35,8 @@ public static partial class AnsiConsoleOutput
             .Append("Interval".PadRight(intervalPad))
             .Append("Best lap".PadRight(blPad))
             .Append("Pts".PadRight(pointsPad))
-            .Append("Bonus".PadRight(pointsPad))
+            .Append("Bon".PadRight(pointsPad))
+            .Append("Pen".PadRight(pointsPad))
             .ToString();
 
         AnsiConsole.MarkupLine($"[bold]{headerString}[/]");
@@ -56,8 +57,9 @@ public static partial class AnsiConsoleOutput
                 .Append(result.Gap.ToString().PadRight(gapPad))
                 .Append(result.Interval.ToString().PadRight(intervalPad))
                 .Append(result.BestLapTime.ToString().PadRight(blPad))
-                .Append(result.Points.ToString().PadRight(pointsPad))
+                .Append((result.Points + result.ExtraPoints - result.Penalty).ToString().PadRight(pointsPad))
                 .Append(result.ExtraPoints.ToString().PadRight(pointsPad))
+                .Append(result.Penalty.ToString().PadRight(pointsPad))
                 .ToString();
 
             AnsiConsole.MarkupLine(rowString);
