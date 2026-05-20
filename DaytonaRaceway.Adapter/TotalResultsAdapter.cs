@@ -1,14 +1,14 @@
 using DaytonaRaceway.Adapter.Models;
 using DaytonaRaceway.Agent;
 using DaytonaRaceway.Agent.Dto;
-using Microsoft.Extensions.Logging;
 
 namespace DaytonaRaceway.Adapter;
 
 public sealed class TotalResultsAdapter : IDisposable
 {
+    private const int MaxPointsForBestQualificationResult = 3;
+
     private readonly ApiAgent _agent;
-    private readonly ILogger<TotalResultsAdapter> _logger = LoggerFactory.Create(c => c.AddConsole()).CreateLogger<TotalResultsAdapter>();
 
     public TotalResultsAdapter(IAgentSettings agentSettings)
     {
@@ -17,159 +17,176 @@ public sealed class TotalResultsAdapter : IDisposable
 
     public void Dispose() => _agent.Dispose();
     
-    public async Task<object> GetResults(Guid raceId, string finalHeatsOrder, CancellationToken cancellationToken)
+    public async Task<IReadOnlyCollection<TotalResults>> GetResults(
+        Guid raceId,
+        FinalStageHeatsOrdering finalStageHeatsOrdering,
+        CancellationToken cancellationToken)
     {
         var stages = await _agent.GetStages(raceId, cancellationToken);
 
-        var raceStages = stages.Stages?.Where(s => s.Type == StageType.Race && !s.IsFinalStage).ToArray();
-        var finalStage = stages.Stages?.SingleOrDefault(s => s.Type == StageType.Race && s.IsFinalStage);
-
-        const int awardedForBestQualyResultCount = 3; // TODO:: const
-        _logger.LogInformation("Determining best {N} qualification results", awardedForBestQualyResultCount);
-        var topNQualyResults = (await TakeTopTotalQualificationBests(
+        var topNQualificationResults = await GetTopTotalQualificationBestResults(
             raceId,
-            stages.Stages ?? [],
-            awardedForBestQualyResultCount,
-            cancellationToken))
-                .Select((x, i) => (x.Key, new LapTime(x.Value), i + 1, awardedForBestQualyResultCount - i))
-                .ToDictionary(x => x.Key, x => x);
-        foreach (var (_, (participant, result, _, points)) in topNQualyResults)
-        {
-            _logger.LogInformation("{Participant} => {TotalLapTime}. Bonus {Points} points", participant, result, points);
-        }
+            stages.Stages?.Where(s => s.Type == StageType.Qualification).ToArray() ?? [],
+            MaxPointsForBestQualificationResult,
+            cancellationToken);
 
-        // TODO:: Bonus point for fastest lap for each heat
-        var raceStageResults = (await Task.WhenAll(raceStages
-                !.SelectMany(s => s.Heats ?? [])
-                .Where(h => h.Id.HasValue)
-                .Select(heat => _agent.GetHeatResults(raceId, heat.Id!.Value, cancellationToken))))
-            .SelectMany(heatResults => heatResults)
+        var raceResults = await RaceStageResults(
+            raceId,
+            stages.Stages?.Where(s => s.Type == StageType.Race && !s.IsFinalStage).ToArray() ?? [],
+            cancellationToken);
+
+        var finalStageResults = await FinalStageResults(
+            raceId,
+            stages.Stages?.SingleOrDefault(s => s.Type == StageType.Race && s.IsFinalStage)!,
+            finalStageHeatsOrdering,
+            cancellationToken);
+
+        return raceResults.Join(
+                finalStageResults,
+                rr => rr.Key,
+                fr => fr.Key,
+                (results, finalResults) =>
+                    (ParticipantId: results.Key, Results: results.Value.Append(finalResults.Value).ToArray()))
+            .Select(results => new TotalResults(
+                results.Results.First().Participant,
+                topNQualificationResults.GetValueOrDefault(results.ParticipantId, 0),
+                results.Results.ToDictionary(
+                    result => result.Stage,
+                    result => result)))
             .ToArray();
-        
-        var stagePointsScale = PointsDistribution.CreateStageScale(raceStageResults.GroupBy(r => r.HeatId).Max(x => x.Count()));
-
-        var races = raceStageResults
-            .Join(
-                raceStages!.SelectMany(x => x.Heats?.Select(h => new
-                {
-                    HeatId = h.Id,
-                    Heat = h.Label ?? $"Heat {h.Index}",
-                    Stage = x.Label ?? $"Stage {x.Index}"
-                }) ?? []),
-                rr => rr.HeatId,
-                rs => rs.HeatId,
-                (resp, obj) => new
-                {
-                    Participant = resp.Participant,
-                    resp.Position,
-                    obj.Heat,
-                    obj.Stage,
-                    Points = stagePointsScale[resp.Position]
-                })
-            .GroupBy(x => x.Participant!)
-            .ToDictionary(
-                x => x.Key,
-                x => x.ToDictionary(v => (v.Stage, v.Heat), v => (v.Position, v.Points)));
-
-        var finalStageResults = (await Task.WhenAll(finalStage!.Heats!
-                .Select(heat => _agent.GetHeatResults(raceId, heat.Id!.Value, cancellationToken))))
-            .SelectMany(heatResults => heatResults)
-            .ToArray();
-        
-        var finalPointsScale = PointsDistribution.CreateFinalScale(finalStageResults.Length);
-        
-        var finals = finalStageResults
-            .Join(
-                finalStage!.Heats?.Select(h => new { HeatId = h.Id, Heat = h.Label ?? $"Heat {h.Index}" }) ?? [],
-                r => r.HeatId,
-                h => h.HeatId,
-                (r, h) => new
-                {
-                    Result = r,
-                    Heat = h.Heat,
-                    HeatOrder = finalHeatsOrder.IndexOf(h.Heat.Replace("Heat", string.Empty).Trim())
-                })
-            .OrderBy(r => r.HeatOrder)
-            .ThenBy(r => r.Result.Position)
-            .Select((result, endToEndPosition) => new{
-                result.Result.Participant,
-                result.Result.Position,
-                result.Heat,
-                Points = finalPointsScale[endToEndPosition + 1]
-            })
-            .OrderByDescending(x => x.Points)
-            .ToArray();
-        
-        var totals = races.Join(
-            finals,
-            r => r.Key,
-            f => f.Participant,
-            (r, f) =>
-            {
-                r.Value.Add(("Final", f.Heat), (f.Position, f.Points));
-                if (topNQualyResults.TryGetValue(r.Key, out var result))
-                {
-                    var (_, _, position, points) = result;
-                    r.Value.Add(("Qualy", "Qualy"), (position, points));
-                }
-                else
-                {
-                    r.Value.Add(("Qualy", "Qualy"), (0, 0));
-                }
-                return new
-                {
-                    Participant = r.Key,
-                    Results = r.Value,
-                };
-            })
-            .OrderByDescending(x => x.Results.Sum(v => v.Value.Points))
-            .ToDictionary(
-                x => x.Participant,
-                x => x.Results);
-        
-        foreach (var (participant, results) in totals)
-        {
-            Console.Write($"{participant,-24}");
-            Console.Write("\t");
-            foreach (var (heat, result) in results)
-            {
-                Console.Write($"{heat.Stage}|{heat.Heat} => {result.Position,-3}{result.Points,-3}");
-            }
-            Console.Write("\t");
-            Console.Write(results.Values.Sum(x => x.Points));
-            Console.WriteLine();
-        }
-        // TODO:: Participant | Heat | Position | Points for all non-final races
-        // TODO:: Participant | Position | Points for final race
-
-        return new object();
     }
 
-    private async Task<Dictionary<string, int>> TakeTopTotalQualificationBests(
+    private async Task<Dictionary<ParticipantId, int>> GetTopTotalQualificationBestResults(
         Guid raceId,
         IReadOnlyCollection<RaceStageDto> stages,
         int count,
         CancellationToken cancellationToken)
     {
         return (await Task.WhenAll(stages
-                .Where(s => s.Type == StageType.Qualification)
                 .SelectMany(s => s.Heats ?? [])
                 .Where(h => h.Id.HasValue)
                 .Select(heat => _agent.GetHeatResults(raceId, heat.Id!.Value, cancellationToken))))
             .SelectMany(heatResults => heatResults)
             .Select(result => result.BestLapTimeRaw == 0 ? result with { BestLapTimeRaw = int.MaxValue } : result)
             .GroupBy(
-                result => result.Participant,
+                result => new ParticipantId(result.ParticipantId),
                 result => result)
             .ToDictionary(
-                resultsGroup => resultsGroup.Key!,
+                resultsGroup => resultsGroup.Key,
                 resultsGroup => resultsGroup.Any(r => r.BestLapTimeRaw == int.MaxValue)
                     ? int.MaxValue
                     : resultsGroup.Sum(x => x.BestLapTimeRaw))
             .OrderBy(participantTotalResult => participantTotalResult.Value)
             .Take(count)
+            .Select((participantResult, i) => (participantResult.Key, Points: MaxPointsForBestQualificationResult - i))
             .ToDictionary(
                 participantResult => participantResult.Key,
-                participantResult => participantResult.Value);
+                participantResult => participantResult.Points);
+    }
+
+    private async Task<Dictionary<ParticipantId, IReadOnlyCollection<TotalResultItem>>> RaceStageResults(
+        Guid raceId,
+        IReadOnlyCollection<RaceStageDto> stages,
+        CancellationToken cancellationToken)
+    {
+        var heatsMap = stages
+            .SelectMany(
+                stage => stage.Heats ?? [],
+                (stage, heat) => new
+                {
+                    Stage = stage.Label ?? $"{stage.Type} {stage.Index}",
+                    HeatId = heat.Id ?? heat.Index,
+                    Heat = heat.Label ?? $"Heat {heat.Index}"
+                })
+            .ToDictionary(
+                item => item.HeatId,
+                item => item);
+
+        var raceStageResults = (await Task.WhenAll(stages
+                .SelectMany(stage => stage.Heats ?? [])
+                .Where(heat => heat.Id.HasValue)
+                .Select(heat => _agent.GetHeatResults(raceId, heat.Id!.Value, cancellationToken))))
+            .SelectMany(heatResults => heatResults)
+            .ToArray();
+
+        var penalties = (await Task.WhenAll(raceStageResults
+                .Select(result => _agent.GetHeatRunDetails(result.HeatRunId, cancellationToken))))
+            .ToDictionary(
+                heatRun => heatRun.Id,
+                heatRun => heatRun.Penalties.Sum(p => p.Penalty));
+
+        var participantPerHeatWithBestLapExtraPoint = raceStageResults
+            .Select(result => result.BestLapTimeRaw == 0 ? result with { BestLapTimeRaw = int.MaxValue } : result)
+            .GroupBy(result => result.HeatId)
+            .ToDictionary(
+                heatGroup => heatGroup.Key,
+                heatGroup => heatGroup.MinBy(r => r.BestLapTimeRaw)!.ParticipantId);
+
+        var maxHeatParticipantsCount = raceStageResults.GroupBy(r => r.HeatId).Max(x => x.Count());
+        var stagePointsScale = PointsDistribution.CreateStageScale(maxHeatParticipantsCount);
+
+        return raceStageResults
+            .GroupBy(result => result.ParticipantId)
+            .ToDictionary(
+                participantResults => new ParticipantId(participantResults.Key),
+                IReadOnlyCollection<TotalResultItem> (participantResults) => participantResults
+                    .Select(result => new TotalResultItem(
+                        heatsMap[result.HeatId].Stage,
+                        heatsMap[result.HeatId].Heat,
+                        result.Participant ?? $"Participant {result.ParticipantId}",
+                        result.Position,
+                        stagePointsScale[result.Position],
+                        participantPerHeatWithBestLapExtraPoint[result.HeatId] == result.ParticipantId ? 1 : 0,
+                        penalties.GetValueOrDefault(result.HeatRunId, 0)))
+                    .ToList());
+    }
+
+    private async Task<Dictionary<ParticipantId, TotalResultItem>> FinalStageResults(
+        Guid raceId,
+        RaceStageDto finalStage,
+        FinalStageHeatsOrdering finalStageHeatsOrdering,
+        CancellationToken cancellationToken)
+    {
+        var heatsMap = (finalStage.Heats ?? [])
+            .ToDictionary(
+                heat => heat.Id ?? heat.Index,
+                heat => heat.Label ?? $"Heat {heat.Index}");
+
+        var finalStageResults = (await Task.WhenAll((finalStage.Heats ?? [])
+                .Where(heat => heat.Id.HasValue)
+                .Select(heat => _agent.GetHeatResults(raceId, heat.Id!.Value, cancellationToken))))
+            .SelectMany(heatResults => heatResults)
+            .ToArray();
+
+        var penalties = (await Task.WhenAll(finalStageResults
+                .Select(result => _agent.GetHeatRunDetails(result.HeatRunId, cancellationToken))))
+            .ToDictionary(
+                heatRun => heatRun.Id,
+                heatRun => heatRun.Penalties.Sum(p => p.Penalty));
+
+        var participantPerHeatWithBestLapExtraPoint = finalStageResults
+            .Select(result => result.BestLapTimeRaw == 0 ? result with { BestLapTimeRaw = int.MaxValue } : result)
+            .GroupBy(result => result.HeatId)
+            .ToDictionary(
+                heatGroup => heatGroup.Key,
+                heatGroup => heatGroup.MinBy(r => r.BestLapTimeRaw)!.ParticipantId);
+
+        var finalPointsScale = PointsDistribution.CreateFinalScale(finalStageResults.Length);
+
+        return (finalStageHeatsOrdering == FinalStageHeatsOrdering.Desc
+                ? finalStageResults.OrderByDescending(result => result.HeatId)
+                : finalStageResults.OrderBy(result => result.HeatId))
+            .ThenBy(result => result.Position)
+            .Select((result, endToEndPosition) => result with { EndToEndStagePosition = endToEndPosition + 1 })
+            .ToDictionary(
+                result => new ParticipantId(result.ParticipantId),
+                result => new TotalResultItem(
+                    finalStage.Label ?? "Final",
+                    heatsMap[result.HeatId],
+                    result.Participant ?? $"Participant {result.ParticipantId}",
+                    result.Position,
+                    finalPointsScale[result.EndToEndStagePosition],
+                    participantPerHeatWithBestLapExtraPoint[result.HeatId] == result.ParticipantId ? 1 : 0,
+                    penalties.GetValueOrDefault(result.HeatRunId, 0)));
     }
 }

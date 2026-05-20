@@ -64,7 +64,7 @@ public sealed class RaceResultsCommand : AsyncCommand<RaceResultsCommand.Setting
         var (stageName, results) =
             await resultsAdapter.GetRaceStageResults(raceId, stage, settings.FinalHeatsOrdering, cancellationToken);
         var stageForOutput = stageName ?? stage.ToString();
-        
+
         var outputFile = settings.Format switch
         {
             OutputFormat.Csv =>
@@ -89,6 +89,16 @@ public sealed class RaceResultsCommand : AsyncCommand<RaceResultsCommand.Setting
         Settings settings,
         CancellationToken cancellationToken)
     {
-        await Task.CompletedTask;
+        using var resultsAdapter = new TotalResultsAdapter(settings);
+        var results = await resultsAdapter.GetResults(raceId, settings.FinalHeatsOrdering, cancellationToken);
+        var orderedResults = results
+            .OrderByDescending(result =>
+                result.ResultsPerStage.Sum(v => v.Value.TotalPoints) + (result.QualificationExtraPoints ?? 0))
+            .ThenBy(result => result.ResultsPerStage.Sum(v => v.Value.PenaltyPoints))
+            .ThenBy(result => result.ResultsPerStage.Last().Value.Position)
+            .ToArray();
+
+        var outputFile = await HtmlOutput.WriteTotalResults(raceId, orderedResults, cancellationToken);
+        AnsiConsole.MarkupLine($"Results: [link={outputFile.AbsoluteUri}]{outputFile.AbsoluteUri}[/]");
     }
 }
