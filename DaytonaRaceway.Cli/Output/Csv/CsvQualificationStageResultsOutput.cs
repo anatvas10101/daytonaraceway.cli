@@ -13,21 +13,10 @@ public static partial class CsvOutput
         IReadOnlyCollection<QualificationResult> results,
         CancellationToken cancellationToken)
     {
-        var filename = $"{raceId}_qualification_stage_{stageId}_results_{TimeProvider.System.GetLocalNow():HHmmss}.csv";
-        var filePath = Path.Combine(AppContext.BaseDirectory, filename);
-        var culture = CultureInfo.CurrentCulture;
-        var config = new CsvConfiguration(culture)
-        {
-            Delimiter = culture.TextInfo.ListSeparator,
-            HasHeaderRecord = true,
-        };
-
-        await using var writer = new StreamWriter(filePath);
-        await using var csv = new CsvWriter(writer, config);
-        csv.Context.RegisterClassMap<QualificationResultCsvMap>();
-        await csv.WriteRecordsAsync(results, cancellationToken);
-
-        return new Uri(filePath);
+        return await WriteCsvFileWithClassMapping<QualificationResult, QualificationResultCsvMap>(
+            $"{raceId}_qualification_stage_{stageId}_results_{TimeProvider.System.GetLocalNow():HHmmss}.csv",
+            results,
+            cancellationToken);
     }
 
     private sealed class QualificationResultCsvMap : ClassMap<QualificationResult>
@@ -52,5 +41,27 @@ public static partial class CsvOutput
             Map(r => r.Percent).Name("%");
             Map(r => r.CompletedLaps).Name("Laps");
         }
+    }
+
+    private static async Task<Uri> WriteCsvFileWithClassMapping<TRow, TMapping>(
+        string filename,
+        IReadOnlyCollection<TRow> results,
+        CancellationToken cancellationToken)
+        where TMapping : ClassMap<TRow>
+    {
+        var filePath = Path.Combine(AppContext.BaseDirectory, filename);
+        var culture = CultureInfo.CurrentCulture;
+        var config = new CsvConfiguration(culture)
+        {
+            Delimiter = culture.TextInfo.ListSeparator,
+            HasHeaderRecord = true,
+        };
+
+        await using var writer = new StreamWriter(filePath);
+        await using var csv = new CsvWriter(writer, config);
+        csv.Context.RegisterClassMap<TMapping>();
+        await csv.WriteRecordsAsync(results, cancellationToken);
+
+        return new Uri(filePath);
     }
 }

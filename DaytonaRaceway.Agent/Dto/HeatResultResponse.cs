@@ -17,4 +17,8 @@ public sealed record HeatResultResponse(
     [property: JsonPropertyName("diff")] string Interval,
     [property: JsonPropertyName("consistency_lap")] string Consistency,
     [property: JsonPropertyName("avg_lap")] string AvgLapTime,
-    [property: JsonIgnore] int HeatId);
+    [property: JsonIgnore] int HeatId)
+{
+    [JsonIgnore]
+    public int EndToEndStagePosition { get; init; }
+}

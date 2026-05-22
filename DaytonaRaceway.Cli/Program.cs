@@ -21,6 +21,9 @@ app.Configure(config =>
         .WithDescription("Shows qualification results of an event (per stage or aggregated result).")
         .WithAlias("qualy");
 
+    config.AddCommand<RaceResultsCommand>("race")
+        .WithDescription("Shows race results of an event (per stage or aggregated result).");
+
     config.AddCommand<GroupsDistributionCommand>("groups")
         .WithDescription("Splits participants into <COUNT> groups based on qualification results.");
 
