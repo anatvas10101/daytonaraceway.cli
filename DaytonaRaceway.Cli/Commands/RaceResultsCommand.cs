@@ -91,14 +91,8 @@ public sealed class RaceResultsCommand : AsyncCommand<RaceResultsCommand.Setting
     {
         using var resultsAdapter = new TotalResultsAdapter(settings);
         var results = await resultsAdapter.GetResults(raceId, settings.FinalHeatsOrdering, cancellationToken);
-        var orderedResults = results
-            .OrderByDescending(result =>
-                result.ResultsPerStage.Sum(v => v.Value.TotalPoints) + (result.QualificationExtraPoints ?? 0))
-            .ThenBy(result => result.ResultsPerStage.Sum(v => v.Value.PenaltyPoints))
-            .ThenBy(result => result.ResultsPerStage.Last().Value.Position)
-            .ToArray();
 
-        var outputFile = await HtmlOutput.WriteTotalResults(raceId, orderedResults, cancellationToken);
+        var outputFile = await HtmlOutput.WriteTotalResults(raceId, results, cancellationToken);
         AnsiConsole.MarkupLine($"Results: [link={outputFile.AbsoluteUri}]{outputFile.AbsoluteUri}[/]");
     }
 }

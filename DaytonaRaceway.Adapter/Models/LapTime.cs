@@ -22,6 +22,7 @@ public record LapTime(int RawMs) : IComparable<LapTime>, IComparable
         parts = parts[0].Split(':');
         return parts.Length switch
         {
+            3 => new LapTime(int.Parse(parts[0]) * 3600 * 1000 + int.Parse(parts[1]) * 60000 + int.Parse(parts[2]) * 1000 + msPart),
             2 => new LapTime(int.Parse(parts[0]) * 60000 + int.Parse(parts[1]) * 1000 + msPart),
             1 => new LapTime(int.Parse(parts[0]) * 1000 + msPart),
             _ => throw new ArgumentException($"Invalid LapTime format: {source}")

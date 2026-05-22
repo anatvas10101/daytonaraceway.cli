@@ -51,8 +51,12 @@ public sealed class TotalResultsAdapter : IDisposable
                 results.Results.First().Participant,
                 topNQualificationResults.GetValueOrDefault(results.ParticipantId, 0),
                 results.Results.ToDictionary(
-                    result => result.Stage,
+                    result => (result.Stage, result.IsFinalStage),
                     result => result)))
+            .OrderByDescending(result =>
+                result.ResultsPerStage.Sum(v => v.Value.TotalPoints) + (result.QualificationExtraPoints ?? 0))
+            .ThenBy(result => result.ResultsPerStage.Sum(v => v.Value.PenaltyPoints))
+            .ThenBy(result => result.ResultsPerStage.Last().Value.Position)
             .ToArray();
     }
 
@@ -124,21 +128,33 @@ public sealed class TotalResultsAdapter : IDisposable
 
         var maxHeatParticipantsCount = raceStageResults.GroupBy(r => r.HeatId).Max(x => x.Count());
         var stagePointsScale = PointsDistribution.CreateStageScale(maxHeatParticipantsCount);
+        var championshipPointsScale = PointsDistribution.CreateChampionshipScale(maxHeatParticipantsCount);
 
         return raceStageResults
+            .Select(result => new TotalResultItem(
+                heatsMap[result.HeatId].Stage,
+                IsFinalStage: false,
+                result.HeatId,
+                heatsMap[result.HeatId].Heat,
+                result.ParticipantId,
+                result.Participant ?? $"Participant {result.ParticipantId}",
+                result.Position,
+                stagePointsScale[result.Position],
+                participantPerHeatWithBestLapExtraPoint[result.HeatId] == result.ParticipantId ? 1 : 0,
+                penalties.GetValueOrDefault(result.HeatRunId, 0)))
+            .GroupBy(result => result.HeatId)
+            .ToDictionary(
+                heatResults => heatResults.Key,
+                heatResults => heatResults
+                    .OrderByDescending(result => result.TotalPoints)
+                    .ThenBy(result => result.PenaltyPoints)
+                    .ThenBy(result => result.Position)
+                    .Select((result, rank) => result with { ChampionshipPoints = championshipPointsScale[rank + 1] }))
+            .SelectMany(heatResults => heatResults.Value)
             .GroupBy(result => result.ParticipantId)
             .ToDictionary(
                 participantResults => new ParticipantId(participantResults.Key),
-                IReadOnlyCollection<TotalResultItem> (participantResults) => participantResults
-                    .Select(result => new TotalResultItem(
-                        heatsMap[result.HeatId].Stage,
-                        heatsMap[result.HeatId].Heat,
-                        result.Participant ?? $"Participant {result.ParticipantId}",
-                        result.Position,
-                        stagePointsScale[result.Position],
-                        participantPerHeatWithBestLapExtraPoint[result.HeatId] == result.ParticipantId ? 1 : 0,
-                        penalties.GetValueOrDefault(result.HeatRunId, 0)))
-                    .ToList());
+                IReadOnlyCollection<TotalResultItem> (participantResults) => participantResults.ToList());
     }
 
     private async Task<Dictionary<ParticipantId, TotalResultItem>> FinalStageResults(
@@ -182,7 +198,10 @@ public sealed class TotalResultsAdapter : IDisposable
                 result => new ParticipantId(result.ParticipantId),
                 result => new TotalResultItem(
                     finalStage.Label ?? "Final",
+                    IsFinalStage: true,
+                    result.HeatId,
                     heatsMap[result.HeatId],
+                    result.ParticipantId,
                     result.Participant ?? $"Participant {result.ParticipantId}",
                     result.Position,
                     finalPointsScale[result.EndToEndStagePosition],
