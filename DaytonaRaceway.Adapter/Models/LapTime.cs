@@ -1,12 +1,19 @@
 namespace DaytonaRaceway.Adapter.Models;
 
-public record LapTime(int RawMs) : IComparable<LapTime>, IComparable
+public record LapTime : IComparable<LapTime>, IComparable
 {
+    protected LapTime(int rawMs) => RawMs = rawMs;
+
     private static LapTime Empty => new(0);
 
     internal static LapTime Max => new(int.MaxValue);
 
+    public int RawMs { get; }
+
     public bool IsMax => RawMs == int.MaxValue;
+    
+    public static LapTime From(int rawMs, int defaultLapTimeMs = 120_000)
+        => rawMs != 0 ? new LapTime(rawMs) : new LapTime(defaultLapTimeMs);
 
     public static LapTime Parse(string source)
     {

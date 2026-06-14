@@ -85,7 +85,7 @@ public sealed class RaceResultsAdapter : IDisposable
                 LapTime.Parse(result.TotalTime),
                 Gap: Gap.ParseGap(result.Gap),
                 Interval: Gap.ParseGap(result.Interval),
-                BestLapTime: new LapTime(result.BestLapTimeRaw),
+                BestLapTime: LapTime.From(result.BestLapTimeRaw),
                 Points: pointsScale[stage.IsFinalStage ? endToEndPosition + 1 : result.Position],
                 ExtraPoints: participantPerHeatWithBestLapExtraPoint[result.HeatId] == result.ParticipantId ? 1 : 0,
                 Penalty: penalties.GetValueOrDefault(result.HeatRunId, 0)))

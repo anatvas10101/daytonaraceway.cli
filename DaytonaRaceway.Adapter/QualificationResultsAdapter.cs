@@ -96,7 +96,7 @@ public sealed class QualificationResultsAdapter : IDisposable
                 result.Participant ?? $"Participant {result.ParticipantId}",
                 result.Kart,
                 finishedHeats.First(h => h.Id == result.HeatId).Label,
-                new LapTime(result.BestLapTimeRaw),
+                LapTime.From(result.BestLapTimeRaw),
                 Gap: i == 0 || result.BestLapTimeRaw == int.MaxValue
                     ? Gap.FromMs(0)
                     : Gap.FromMs(result.BestLapTimeRaw - orderedResults[0].BestLapTimeRaw),
