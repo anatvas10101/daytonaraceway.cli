@@ -14,6 +14,9 @@ public record LapTime : IComparable<LapTime>, IComparable
     
     public static LapTime From(int rawMs, int defaultLapTimeMs = 120_000)
         => rawMs != 0 ? new LapTime(rawMs) : new LapTime(defaultLapTimeMs);
+    
+    public static LapTime Min(int rawMs, int defaultLapTimeMs = 120_000)
+        => rawMs == 0 || rawMs > defaultLapTimeMs ? new LapTime(defaultLapTimeMs) : new LapTime(rawMs);
 
     public static LapTime Parse(string source)
     {

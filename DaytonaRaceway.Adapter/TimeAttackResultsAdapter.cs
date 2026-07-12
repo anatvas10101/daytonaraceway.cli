@@ -20,6 +20,7 @@ public sealed class TimeAttackResultsAdapter : IDisposable
         IReadOnlyCollection<TimeAttackKartResult> KartResults)> GetResults(
         Guid raceId,
         int defaultLapTimeMs,
+        bool excludeDefaultFromAvg,
         int nForTopNKartResults,
         CancellationToken cancellationToken = default)
     {
@@ -38,13 +39,17 @@ public sealed class TimeAttackResultsAdapter : IDisposable
             .Select(resultsGroup => new
             {
                 Participant = resultsGroup.Key,
-                Results = resultsGroup.Select(result => (result.HeatId, Kart: result.Kart!, LapTime: LapTime.From(result.BestLapTimeRaw, defaultLapTimeMs)))
+                Results = resultsGroup.Select(result => (result.HeatId, Kart: result.Kart!, LapTime: LapTime.Min(result.BestLapTimeRaw, defaultLapTimeMs)))
             })
             .Select(result => new
             {
                 result.Participant,
                 result.Results,
-                Average = LapTime.From((int)Math.Round(result.Results.Average(r => r.LapTime.RawMs), MidpointRounding.AwayFromZero)),
+                Average = LapTime.From((int)Math.Round(
+                    result.Results
+                        .Where(r => !excludeDefaultFromAvg || r.LapTime.RawMs != defaultLapTimeMs)
+                        .Average(r => r.LapTime.RawMs),
+                    MidpointRounding.AwayFromZero)),
                 Best = LapTime.From(result.Results.Min(r => r.LapTime.RawMs)),
             })
             .OrderBy(result => result.Average)

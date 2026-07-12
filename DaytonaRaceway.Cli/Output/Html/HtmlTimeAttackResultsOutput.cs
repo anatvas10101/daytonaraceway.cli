@@ -48,21 +48,40 @@ public static partial class HtmlOutput
 
             foreach (var kart in distinctOrderedKarts)
             {
-                var kartResult = result.SessionResults.FirstOrDefault(sr => sr.KartNumber == kart);
-                if (kartResult == null)
+                var resultsByKart = result.SessionResults.Where(sr => sr.KartNumber == kart).ToArray();
+                if (resultsByKart == null || resultsByKart.Length == 0)
                 {
                     html.Append("<td></td>");
-                    continue;
                 }
-
-                var formattedOutput = kartResult switch
+                else if (resultsByKart.Length == 1)
                 {
-                    { IsBestLap: true, IsFirstHeat: true } => "<td><mark><u>{0}</u></mark></td>",
-                    { IsBestLap: true } => "<td><mark>{0}</mark></td>",
-                    { IsFirstHeat: true } => "<td><u>{0}</u></td>",
-                    _ => "<td>{0}</td>",
-                };
-                html.Append(string.Format(formattedOutput, kartResult.BestLapTime));
+                    var formattedOutput = resultsByKart[0] switch
+                    {
+                        { IsBestLap: true, IsFirstHeat: true } => "<td><mark><u>{0}</u></mark></td>",
+                        { IsBestLap: true } => "<td><mark>{0}</mark></td>",
+                        { IsFirstHeat: true } => "<td><u>{0}</u></td>",
+                        _ => "<td>{0}</td>",
+                    };
+                    html.Append(string.Format(formattedOutput, resultsByKart[0].BestLapTime));
+                }
+                else
+                {
+                    var fmt = new List<string>();
+                    foreach (var r in resultsByKart)
+                    {
+                        var formattedOutput = r switch
+                        {
+                            { IsBestLap: true, IsFirstHeat: true } => "<mark><u>{0}</u></mark>",
+                            { IsBestLap: true } => "<mark>{0}</mark>",
+                            { IsFirstHeat: true } => "<u>{0}</u>",
+                            _ => "{0}",
+                        };
+
+                        fmt.Add(string.Format(formattedOutput, r.BestLapTime));
+                    }
+
+                    html.Append($"<td>{string.Join("<br/>", fmt)}</td>");
+                }
             }
 
             html.AppendLine("</tr>");

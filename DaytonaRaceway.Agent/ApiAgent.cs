@@ -60,7 +60,8 @@ public sealed class ApiAgent : IDisposable
                         s.Status,
                         stg?.IsFinalStage is true,
                         s.Heats
-                            ?.Select(h => new StageHeatDto(h.Id, h.Label, h.Index, h.Status))
+                            ?.Where(h => !string.IsNullOrEmpty(h.GreenFlag))
+                            .Select(h => new StageHeatDto(h.Id, h.Label, h.Index, h.Status))
                             .OrderBy(h => h.Index)
                             .ToList());
                 })

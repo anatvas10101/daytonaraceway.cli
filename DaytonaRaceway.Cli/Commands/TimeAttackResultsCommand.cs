@@ -13,17 +13,21 @@ public class TimeAttackResultsCommand : AsyncCommand<TimeAttackResultsCommand.Se
     {
         [CommandOption("-l|--default-lap <SECONDS>")]
         [Description("Default lap time (in seconds) to replace a missing result.")]
-        [DefaultValue(120)]
-        public int DefaultLapTime { get; init; } = 120;
+        [DefaultValue(90)]
+        public int DefaultLapTime { get; init; } = 90;
+
+        [CommandOption("-e|--exclude-default-from-average")]
+        [Description("Whether to exclude participant's default lap times from their average lap time calculation.")]
+        public bool ExcludeDefaultLapsFromAverage { get; init; }
 
         [CommandOption("-k|--kart-results")]
-        [Description("A flag determining whether to include kart results to a results table.")]
+        [Description("Whether to include average TOP-N kart statistics to a results table.")]
         public bool IncludeKartResults { get; init; }
 
         [CommandOption("-n|--average-from-top-n")]
         [Description("Numner of top results per kart to calculate average kart time.")]
-        [DefaultValue(6)]
-        public int N { get; init; } = 6;
+        [DefaultValue(5)]
+        public int N { get; init; } = 5;
 
         [CommandOption("--sourceip <IP>")]
         [Description("IP address of the API host.")]
@@ -39,8 +43,12 @@ public class TimeAttackResultsCommand : AsyncCommand<TimeAttackResultsCommand.Se
     protected override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
         using var resultsAdapter = new TimeAttackResultsAdapter(settings);
-        var (results, kartResults) =
-            await resultsAdapter.GetResults(settings.RaceId, settings.DefaultLapTime * 1000, settings.N, cancellationToken);
+        var (results, kartResults) = await resultsAdapter.GetResults(
+            settings.RaceId,
+            settings.DefaultLapTime * 1000,
+            settings.ExcludeDefaultLapsFromAverage,
+            settings.N,
+            cancellationToken);
 
         var outputFile = await HtmlOutput.WriteTimeAttackResults(results, kartResults, settings, cancellationToken);
         AnsiConsole.MarkupLine($"Results: [link={outputFile.AbsoluteUri}]{outputFile.AbsoluteUri}[/]");
