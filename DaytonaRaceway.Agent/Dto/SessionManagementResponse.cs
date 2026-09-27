@@ -18,4 +18,5 @@ public sealed record StageHeatResponseDto(
     [property: JsonPropertyName("race_heat_id")] int? Id,
     [property: JsonPropertyName("label")] string? Label,
     [property: JsonPropertyName("num")] int Index,
-    [property: JsonPropertyName("status")] Status Status);
+    [property: JsonPropertyName("status")] Status Status,
+    [property: JsonPropertyName("green_flag")] string? GreenFlag);

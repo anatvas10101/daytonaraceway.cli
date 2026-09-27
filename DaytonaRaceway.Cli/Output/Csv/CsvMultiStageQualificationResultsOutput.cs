@@ -41,9 +41,9 @@ public static partial class CsvOutput
             csv.WriteField(position++);
             csv.WriteField(result.Participant);
             for (var i = 1; i <= stagesCount; i++)
-                csv.WriteField((result.StageLapTime(i).IsMax ? new LapTime(120_000) : result.StageLapTime(i)).ToString());
-            csv.WriteField((result.BestLapTime.IsMax ? new LapTime(120_000) : result.BestLapTime).ToString());
-            csv.WriteField((result.AggregatedLapTime.IsMax ? new LapTime(120_000) : result.AggregatedLapTime).ToString());
+                csv.WriteField((result.StageLapTime(i).IsMax ? LapTime.From(120_000) : result.StageLapTime(i)).ToString());
+            csv.WriteField((result.BestLapTime.IsMax ? LapTime.From(120_000) : result.BestLapTime).ToString());
+            csv.WriteField((result.AggregatedLapTime.IsMax ? LapTime.From(120_000) : result.AggregatedLapTime).ToString());
             await csv.NextRecordAsync();
         }
 

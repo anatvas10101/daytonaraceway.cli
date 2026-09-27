@@ -11,5 +11,5 @@ public record MultiStageQualificationResult(
     public LapTime AggregatedLapTime
         => Results.Any(x => x.BestLapTime == LapTime.Max)
             ? LapTime.Max
-            : new LapTime(Results.Sum(x => x.BestLapTime.RawMs));
+            : LapTime.From(Results.Sum(x => x.BestLapTime.RawMs));
 }

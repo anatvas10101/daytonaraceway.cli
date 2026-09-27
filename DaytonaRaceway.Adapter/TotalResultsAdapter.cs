@@ -26,7 +26,7 @@ public sealed class TotalResultsAdapter : IDisposable
 
         var topNQualificationResults = await GetTopTotalQualificationBestResults(
             raceId,
-            stages.Stages?.Where(s => s.Type == StageType.Qualification).ToArray() ?? [],
+            stages.Stages?.Where(s => s.Type != StageType.Qualification).ToArray() ?? [],
             MaxPointsForBestQualificationResult,
             cancellationToken);
 

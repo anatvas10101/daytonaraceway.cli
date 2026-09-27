@@ -29,6 +29,10 @@ app.Configure(config =>
 
     config.AddCommand<PointsScaleCommand>("points")
         .WithDescription("Shows a points scale of a selected type for a given number of participants.");
+
+    config.AddCommand<TimeAttackResultsCommand>("time-attack")
+        .WithAlias("ta")
+        .WithDescription("Shows the results of a Time Attack event.");
 });
 
 return await app.RunAsync(args, cancellationTokenSource.Token);

@@ -6,7 +6,7 @@ namespace DaytonaRaceway.Agent;
 public sealed class ApiAgent : IDisposable
 {
     public const string DefaultIpHost = "213.7.195.58"; // TODO:: 192.168.11.2 for local calls at Daytona track
-    public const int DefaultPort = 8080;
+    public const int DefaultPort = 8080; // TODO:: 80 for local calls at Daytona track
 
     private readonly HttpClient _client;
 
@@ -60,7 +60,8 @@ public sealed class ApiAgent : IDisposable
                         s.Status,
                         stg?.IsFinalStage is true,
                         s.Heats
-                            ?.Select(h => new StageHeatDto(h.Id, h.Label, h.Index, h.Status))
+                            ?.Where(h => !string.IsNullOrEmpty(h.GreenFlag))
+                            .Select(h => new StageHeatDto(h.Id, h.Label, h.Index, h.Status))
                             .OrderBy(h => h.Index)
                             .ToList());
                 })
