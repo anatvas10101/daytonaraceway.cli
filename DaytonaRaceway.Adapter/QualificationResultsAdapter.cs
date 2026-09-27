@@ -20,8 +20,7 @@ public sealed class QualificationResultsAdapter : IDisposable
         int stageId,
         CancellationToken cancellationToken)
     {
-        var qualificationStages = await GetQualificationStages(raceId, cancellationToken);
-        var stage = qualificationStages
+        var stage = (await _agent.GetStages(raceId, cancellationToken)).Stages
                 ?.FirstOrDefault(s => s.Id == stageId
                     || s.Label?.Equals($"Qualy {stageId}", StringComparison.OrdinalIgnoreCase) is true)
             ?? throw new InvalidOperationException($"Qualification stage {stageId} not found in race {raceId}.");
@@ -67,7 +66,7 @@ public sealed class QualificationResultsAdapter : IDisposable
         CancellationToken cancellationToken)
     {
         var stages = await _agent.GetStages(raceId, cancellationToken);
-        return stages.Stages?.Where(s => s.Type == StageType.Qualification).ToArray();
+        return stages.Stages?.Where(s => s.Type != StageType.Race).ToArray();
     }
 
     private async Task<IReadOnlyCollection<QualificationResult>> GetAndTransformQualificationStageResults(
